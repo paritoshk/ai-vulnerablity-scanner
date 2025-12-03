@@ -5,7 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
-
+*pyc
 # Distribution / packaging
 .Python
 build/
@@ -205,3 +205,18 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Project specific
+outputs/
+logs/
+
+# Next.js
+.next/
+next-env.d.ts
+
+# Local env files
+.env.local
+.env*.local
+
+# Vercel
+.vercel
