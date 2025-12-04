@@ -5,7 +5,7 @@ __pycache__/
 
 # C extensions
 *.so
-
+*pyc
 # Distribution / packaging
 .Python
 build/
@@ -16,6 +16,8 @@ eggs/
 .eggs/
 lib/
 lib64/
+# But don't ignore web-app/lib (Next.js utility folder)
+!web-app/lib/
 parts/
 sdist/
 var/
@@ -205,3 +207,18 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Project specific
+outputs/
+logs/
+
+# Next.js
+.next/
+next-env.d.ts
+
+# Local env files
+.env.local
+.env*.local
+
+# Vercel
+.vercel
