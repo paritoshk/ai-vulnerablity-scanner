@@ -1,0 +1,107 @@
+name: Claude Code PR Review
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+on:
+  # Trigger on @claude mentions in PR and issue comments
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+
+  # Auto-review when PRs are opened or updated
+  pull_request:
+    types: [opened, synchronize]
+
+  # Respond to issues with @claude mentions
+  issues:
+    types: [opened, assigned]
+
+jobs:
+  claude-review:
+    # Only run if @claude is mentioned OR on PR open/sync
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'issues' && contains(github.event.issue.body, '@claude')) ||
+      (github.event_name == 'pull_request')
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Run Claude Code Action
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+
+          # For PR reviews, automatically review the code
+          prompt: |
+            ${{ github.event_name == 'pull_request' && 'Review this PR for:
+            - Security vulnerabilities (API key exposure, injection attacks, XSS, etc.)
+            - Code quality and best practices
+            - Potential bugs and edge cases
+            - Integration issues between frontend and backend
+            - Missing error handling
+            - Performance concerns
+
+            Provide specific file/line references for any issues found.' || '' }}
+
+          # Configure Claude's behavior
+          claude_args: |
+            --max-turns 10
+            --model claude-sonnet-4-5-20250929
+
+          # Custom trigger phrase (default is @claude)
+          trigger_phrase: "@claude"
+
+  # Optional: Auto-review on specific file changes
+  security-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for sensitive file changes
+        id: changed-files
+        run: |
+          # Check if any .env, API keys, or auth files changed
+          CHANGED=$(git diff --name-only ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep -E '\.env|api|auth|secret|key' || true)
+          if [ -n "$CHANGED" ]; then
+            echo "sensitive_files_changed=true" >> $GITHUB_OUTPUT
+            echo "Changed files: $CHANGED"
+          else
+            echo "sensitive_files_changed=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run security-focused review
+        if: steps.changed-files.outputs.sensitive_files_changed == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            SECURITY AUDIT REQUIRED - Sensitive files were modified.
+
+            Perform a thorough security review focusing on:
+            1. API key exposure or hardcoded secrets
+            2. Authentication/authorization bypasses
+            3. Input validation and sanitization
+            4. SQL injection or command injection vectors
+            5. Insecure file operations
+            6. Missing HTTPS/TLS enforcement
+            7. CORS misconfigurations
+            8. Dependency vulnerabilities
+
+            Flag any HIGH or CRITICAL issues immediately.
+          claude_args: "--max-turns 15 --model claude-sonnet-4-5-20250929"
