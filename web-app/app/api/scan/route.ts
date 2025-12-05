@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_SERVER_URL = process.env.API_SERVER_URL || "http://localhost:8000";
+const API_SERVER_URL = (process.env.API_SERVER_URL || "http://localhost:8000").replace(/\/$/, "");
 
 export async function POST(request: NextRequest) {
     try {
