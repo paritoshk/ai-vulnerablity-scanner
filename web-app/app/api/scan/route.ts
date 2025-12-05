@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const API_SERVER_URL = (process.env.API_SERVER_URL || "http://localhost:8000").replace(/\/$/, "");
+const API_SERVER_URL = (process.env.API_SERVER_URL || "").replace(/\/$/, "");
+
+if (!API_SERVER_URL) {
+    throw new Error("API_SERVER_URL environment variable is required");
+}
 
 export async function POST(request: NextRequest) {
     try {
@@ -121,4 +125,4 @@ export async function POST(request: NextRequest) {
 
 // Disable static optimization for this route
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60; // Allow up to 60 seconds for scan
+export const maxDuration = 120; // Allow up to 120 seconds for scan
