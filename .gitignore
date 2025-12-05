@@ -211,10 +211,13 @@ __marimo__/
 # Project specific
 outputs/
 logs/
+api-server/logs/
+api-server/__pycache__/
 
 # Next.js
 .next/
 next-env.d.ts
+node_modules/
 
 # Local env files
 .env.local
@@ -222,3 +225,6 @@ next-env.d.ts
 
 # Vercel
 .vercel
+
+# Railway
+.railway/
