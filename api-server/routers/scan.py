@@ -1,7 +1,7 @@
 """Scan router for vulnerability scanning endpoints"""
 import asyncio
 import logging
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import StreamingResponse
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -22,50 +22,30 @@ router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
 
 
-async def generate_scan_stream(scan_data: ScanRequest):
+@router.post("/scan")
+@limiter.limit("10/minute")
+async def scan_vulnerabilities(request: Request, scan_data: ScanRequest):
     """
-    Generate Server-Sent Events stream for scan progress
-    
-    Yields SSE-formatted data for each scan step
+    Scan for AI/LLM vulnerabilities and return results
+    Simple synchronous endpoint - waits for scan to complete
     """
     try:
-        # Step 1: Initialize
-        yield f"data: {json.dumps({'step': 'init', 'status': 'running'})}\n\n"
-        await asyncio.sleep(0.5)
-        yield f"data: {json.dumps({'step': 'init', 'status': 'complete'})}\n\n"
+        logger.info(f"Received scan request for company: {scan_data.company}")
         
-        # Step 2: Search for vulnerabilities
-        yield f"data: {json.dumps({'step': 'search', 'status': 'running'})}\n\n"
+        # Step 1: Search for vulnerabilities
         logger.info(f"Starting vulnerability search for {scan_data.company}")
-        
-        # Build search query with company and LLM context
         search_data = search_vulnerabilities(hours_back=24)
         
-        yield f"data: {json.dumps({'step': 'search', 'status': 'complete'})}\n\n"
-        
-        # Step 3: Analyze with Gemini
-        yield f"data: {json.dumps({'step': 'analyze', 'status': 'running'})}\n\n"
+        # Step 2: Analyze with Gemini
         logger.info("Analyzing vulnerabilities with Gemini Pro 3")
-        
         analysis = analyze_with_gemini(search_data)
         
-        yield f"data: {json.dumps({'step': 'analyze', 'status': 'complete'})}\n\n"
-        
-        # Step 4: Calculate risk score
-        yield f"data: {json.dumps({'step': 'score', 'status': 'running'})}\n\n"
+        # Step 3: Calculate risk score
         logger.info("Calculating AI-RQ risk score")
-        
         risk = calculate_risk_score(analysis.get("vulnerabilities", []))
         
-        yield f"data: {json.dumps({'step': 'score', 'status': 'complete'})}\n\n"
-        
-        # Step 5: Generate report
-        yield f"data: {json.dumps({'step': 'report', 'status': 'running'})}\n\n"
-        await asyncio.sleep(0.3)
-        yield f"data: {json.dumps({'step': 'report', 'status': 'complete'})}\n\n"
-        
-        # Final result
-        scan_result = {
+        # Build result
+        result = {
             "success": True,
             "company": scan_data.company,
             "llmProvider": scan_data.llmProvider,
@@ -78,40 +58,9 @@ async def generate_scan_stream(scan_data: ScanRequest):
             "risk": risk,
         }
         
-        # Send done event with full results
-        done_event = {
-            "step": "done",
-            "status": "complete",
-            "result": scan_result
-        }
-        yield f"data: {json.dumps(done_event)}\n\n"
         logger.info(f"Scan completed for {scan_data.company} - AI-RQ: {risk['ai_rq_score']}")
+        return result
         
     except Exception as e:
-        logger.error(f"Scan failed: {str(e)}", exc_info=True) # Kept exc_info=True for better logging
-        error_event = {
-            "step": "error",
-            "status": "error",
-            "error": str(e)
-        }
-        yield f"data: {json.dumps(error_event)}\n\n"
-
-
-@router.post("/scan")
-@limiter.limit("10/minute")  # Rate limit: 10 scans per minute per IP
-async def scan_vulnerabilities(request: Request, scan_data: ScanRequest):
-    """
-    POST /scan endpoint with Server-Sent Events (SSE) streaming
-    Returns real-time progress updates during the scan
-    """
-    logger.info(f"Received scan request for company: {scan_data.company}")
-    
-    return StreamingResponse(
-        generate_scan_stream(scan_data),
-        media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable buffering for nginx
-        }
-    )
+        logger.error(f"Scan failed: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
