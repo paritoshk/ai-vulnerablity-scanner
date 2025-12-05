@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { spawn } from "child_process";
-import path from "path";
+
+const API_SERVER_URL = process.env.API_SERVER_URL || "http://localhost:8000";
 
 export async function POST(request: NextRequest) {
     try {
@@ -29,102 +29,58 @@ export async function POST(request: NextRequest) {
         const encoder = new TextEncoder();
         const stream = new ReadableStream({
             async start(controller) {
-                const sendUpdate = (step: string, status: string) => {
-                    controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify({ step, status })}\n\n`)
-                    );
-                };
-
                 try {
-                    // Step 1: Initializing
-                    sendUpdate("init", "running");
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    sendUpdate("init", "complete");
-
-                    // Step 2: Searching vulnerabilities
-                    sendUpdate("search", "running");
-
-                    // Path to the Python scanner
-                    const scannerPath = path.join(process.cwd(), "..", "main.py");
-                    const pythonProcess = spawn("uv", ["run", "python3", scannerPath], {
-                        cwd: path.join(process.cwd(), ".."),
+                    // Call FastAPI server
+                    const response = await fetch(`${API_SERVER_URL}/api/scan`, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                        },
+                        body: JSON.stringify({
+                            company,
+                            llmProvider,
+                            modelVersion,
+                            contextWindow,
+                            ragImplementation,
+                            vectorDb,
+                            deploymentEnv,
+                        }),
                     });
 
-                    let output = "";
-                    let error = "";
+                    if (!response.ok) {
+                        throw new Error(`API server returned ${response.status}: ${response.statusText}`);
+                    }
 
-                    pythonProcess.stdout.on("data", (data) => {
-                        output += data.toString();
-                        const text = data.toString();
+                    if (!response.body) {
+                        throw new Error("API server did not return a readable stream");
+                    }
 
-                        // Track progress based on Python output
-                        if (text.includes("Searching")) {
-                            sendUpdate("search", "running");
-                        } else if (text.includes("Found") && text.includes("results")) {
-                            sendUpdate("search", "complete");
-                            sendUpdate("analyze", "running");
-                        } else if (text.includes("Analyzing")) {
-                            sendUpdate("analyze", "running");
-                        } else if (text.includes("Analysis complete")) {
-                            sendUpdate("analyze", "complete");
-                            sendUpdate("score", "running");
-                        } else if (text.includes("AI-RQ")) {
-                            sendUpdate("score", "complete");
-                            sendUpdate("report", "running");
+                    // Stream the response from FastAPI to the client
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder();
+
+                    while (true) {
+                        const { done, value } = await reader.read();
+
+                        if (done) {
+                            controller.close();
+                            break;
                         }
-                    });
 
-                    pythonProcess.stderr.on("data", (data) => {
-                        error += data.toString();
-                    });
-
-                    // Wait for process to complete
-                    await new Promise((resolve, reject) => {
-                        pythonProcess.on("close", (code) => {
-                            if (code === 0) {
-                                resolve(output);
-                            } else {
-                                reject(new Error(error || "Scanner failed"));
-                            }
-                        });
-                    });
-
-                    sendUpdate("report", "complete");
-
-                    // Read the generated output files
-                    const fs = require("fs").promises;
-                    const outputPath = path.join(process.cwd(), "..", "outputs", "vuln_analysis.json");
-
-                    const fileContent = await fs.readFile(outputPath, "utf8");
-                    const analysisData = JSON.parse(fileContent);
-
-                    // Send final result
-                    controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify({
-                            step: "done",
-                            status: "complete",
-                            result: {
-                                success: true,
-                                company,
-                                llmProvider,
-                                modelVersion,
-                                contextWindow,
-                                ragImplementation,
-                                vectorDb,
-                                deploymentEnv,
-                                analysis: analysisData.analysis,
-                                risk: analysisData.risk,
-                            }
-                        })}\n\n`)
-                    );
-
-                    controller.close();
+                        // Decode and forward the SSE data
+                        const chunk = decoder.decode(value, { stream: true });
+                        controller.enqueue(encoder.encode(chunk));
+                    }
                 } catch (error: any) {
+                    console.error("Scan error:", error);
+
+                    // Send error to client
+                    const errorMessage = error.message || "Unknown error occurred";
                     controller.enqueue(
                         encoder.encode(`data: ${JSON.stringify({
                             step: "error",
                             status: "error",
-                            error: error.message
+                            error: errorMessage
                         })}\n\n`)
                     );
                     controller.close();

@@ -16,30 +16,68 @@ Agent that automatically discovers and fixes top vulnerabilities for your agenti
 
 ## Architecture
 
+This project uses a **client-server architecture** with three components:
+
+```
+┌─────────────────┐      HTTP/SSE      ┌─────────────────┐
+│   Next.js Web   │ ◄──────────────► │  FastAPI Server │
+│   (Frontend)    │                     │   (Backend)     │
+└─────────────────┘                     └─────────────────┘
+                                              │
+                                              ▼
+                                        ┌──────────────┐
+                                        │  Scanner     │
+                                        │  Modules     │
+                                        │  (src/)      │
+                                        └──────────────┘
+```
+
+**Project Structure:**
 ```
 ai-vulnerablity-scanner/
-├── src/
-│   ├── __init__.py
+├── api-server/             # FastAPI backend
+│   ├── main.py            # FastAPI app
+│   ├── routers/           # API endpoints
+│   │   └── scan.py        # Scan endpoint with SSE
+│   └── models.py          # Pydantic models
+├── src/                   # Scanner modules
 │   ├── search.py          # Parallel Web Systems integration
-│   ├── analysis.py        # Gemini Pro 3 analysis with response_schema
+│   ├── analysis.py        # Gemini Pro 3 analysis
 │   ├── scoring.py         # AI-RQ risk scoring
 │   ├── report.py          # Report generation
-│   └── schemas.py         # Pydantic models
+│   └── schemas.py         # Pydantic schemas
+├── web-app/               # Next.js frontend
+│   └── app/
+│       ├── page.tsx       # Landing page
+│       ├── dashboard/     # Scan dashboard
+│       └── api/scan/      # Next.js API proxy
+├── tests/                 # Test suite
+│   ├── test_scoring.py
+│   ├── test_analysis.py
+│   └── test_integration.py
 ├── config/
 │   └── frameworks.py      # OWASP/MITRE constants
 ├── outputs/               # Generated reports
-│   ├── vuln_analysis.json
-│   └── vuln_report.md
-├── main.py                # Entry point
-├── requirements.txt
-├── .env                   # API keys (gitignored)
-└── .env.example
+├── main.py                # CLI entry point
+└── pyproject.toml         # Dependencies (uv)
 ```
 
 ## Setup
 
-### 1. Install Dependencies
+### Prerequisites
 
+- Python 3.10+
+- Node.js 18+
+- `uv` package manager (recommended) or `pip`
+
+### 1. Install Python Dependencies
+
+Using `uv` (recommended):
+```bash
+uv sync
+```
+
+Or using pip:
 ```bash
 pip install -r requirements.txt
 ```
@@ -58,11 +96,31 @@ GEMINI_API_KEY=your_gemini_api_key
 PARALLEL_API_KEY=your_parallel_api_key
 ```
 
-### 3. Run the Scanner
+### 3. Run the Application
+
+#### Option A: Web UI (Recommended)
+
+**Terminal 1 - Start FastAPI Server:**
+```bash
+cd api-server
+uv run uvicorn main:app --reload --port 8000
+```
+
+**Terminal 2 - Start Next.js Frontend:**
+```bash
+cd web-app
+npm install
+npm run dev
+```
+
+Visit http://localhost:3000
+
+#### Option B: Command Line
 
 ```bash
 python main.py
 ```
+
 
 ## How It Works
 
@@ -135,6 +193,37 @@ Get your API keys from:
 - **Gemini**: https://aistudio.google.com/apikey
 - **Parallel Web Systems**: https://parallel.ai/
 
+## Testing
+
+Run the test suite:
+
+```bash
+# Unit tests
+uv run pytest tests/ -v
+
+# Integration tests (requires FastAPI server running)
+uv run python tests/test_integration.py
+```
+
+Current test coverage:
+- ✅ 18 unit tests passing
+- ✅ Risk scoring validation
+- ✅ Pydantic schema validation
+- ✅ Integration test with real scan
+
+## API Documentation
+
+For detailed API documentation, deployment guides, and troubleshooting, see:
+
+**[📖 README_API.md](README_API.md)**
+
+Topics covered:
+- FastAPI endpoints and SSE format
+- Rate limiting and CORS
+- Deployment to production
+- Testing examples
+- Troubleshooting guide
+
 ## Framework References
 
 - **OWASP LLM Top 10 (2025)**: https://owasp.org/www-project-top-10-for-large-language-model-applications/
@@ -143,3 +232,4 @@ Get your API keys from:
 ## License
 
 MIT 
+
