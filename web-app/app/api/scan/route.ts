@@ -30,6 +30,9 @@ export async function POST(request: NextRequest) {
         const stream = new ReadableStream({
             async start(controller) {
                 try {
+                    // Log which API we're calling
+                    console.log(`Calling API: ${API_SERVER_URL}/api/scan`);
+
                     // Call FastAPI server
                     const response = await fetch(`${API_SERVER_URL}/api/scan`, {
                         method: "POST",
@@ -48,6 +51,8 @@ export async function POST(request: NextRequest) {
                     });
 
                     if (!response.ok) {
+                        const errorText = await response.text();
+                        console.error(`API error: ${response.status} ${response.statusText}`, errorText);
                         throw new Error(`API server returned ${response.status}: ${response.statusText}`);
                     }
 
