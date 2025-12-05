@@ -63,17 +63,26 @@ export async function POST(request: NextRequest) {
                     // Stream the response from FastAPI to the client
                     const reader = response.body.getReader();
                     const decoder = new TextDecoder();
+                    let chunkCount = 0;
 
                     while (true) {
                         const { done, value } = await reader.read();
 
                         if (done) {
+                            console.log(`Stream completed after ${chunkCount} chunks`);
                             controller.close();
                             break;
                         }
 
                         // Decode and forward the SSE data
                         const chunk = decoder.decode(value, { stream: true });
+                        chunkCount++;
+
+                        // Log to see if we're receiving the final result
+                        if (chunk.includes('"step":"done"')) {
+                            console.log('Received final "done" event from API');
+                        }
+
                         controller.enqueue(encoder.encode(chunk));
                     }
                 } catch (error: any) {
