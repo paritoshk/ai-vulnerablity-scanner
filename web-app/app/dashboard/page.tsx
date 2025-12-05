@@ -71,6 +71,20 @@ export default function Dashboard() {
         setScanSteps(prev => prev.map(step => ({ ...step, status: "pending" as const })));
 
         try {
+            // Simulate progress updates
+            const simulateProgress = async () => {
+                const steps = ["init", "search", "analyze", "score", "report"];
+                for (const step of steps) {
+                    updateStepStatus(step, "running");
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    updateStepStatus(step, "complete");
+                }
+            };
+
+            // Start progress simulation
+            const progressPromise = simulateProgress();
+
+            // Make the actual API call
             const response = await fetch("/api/scan", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -85,38 +99,27 @@ export default function Dashboard() {
                 }),
             });
 
-            const reader = response.body?.getReader();
-            const decoder = new TextDecoder();
-
-            if (!reader) throw new Error("No response stream");
-
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-
-                const chunk = decoder.decode(value);
-                const lines = chunk.split("\n");
-
-                for (const line of lines) {
-                    if (line.startsWith("data: ")) {
-                        const data = JSON.parse(line.slice(6));
-
-                        if (data.step && data.status) {
-                            if (data.step === "done") {
-                                setScanResults(data.result);
-                            } else if (data.step === "error") {
-                                console.error("Scan error:", data.error);
-                                alert(`Scan failed: ${data.error}`);
-                            } else {
-                                updateStepStatus(data.step, data.status);
-                            }
-                        }
-                    }
-                }
+            if (!response.ok) {
+                throw new Error(`Scan failed: ${response.statusText}`);
             }
-        } catch (error) {
+
+            const result = await response.json();
+
+            // Wait for progress animation to finish
+            await progressPromise;
+
+            // Check if we got results
+            if (result.success !== false && result.analysis && result.risk) {
+                setScanResults(result);
+            } else if (result.error) {
+                throw new Error(result.error);
+            } else {
+                throw new Error("Invalid response from server");
+            }
+
+        } catch (error: any) {
             console.error("Scan failed:", error);
-            alert("Scan failed. Please try again.");
+            alert(`Scan failed: ${error.message || "Unknown error"}`);
         } finally {
             setIsScanning(false);
         }
