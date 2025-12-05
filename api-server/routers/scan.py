@@ -85,23 +85,30 @@ async def generate_scan_stream(scan_data: ScanRequest):
         yield f"data: {json.dumps(result)}\n\n"
         logger.info(f"Scan completed for {scan_data.company} - AI-RQ: {risk['ai_rq_score']}")
         
+        # Send done event with full results
+        done_event = {
+            "step": "done",
+            "status": "complete",
+            "result": result # Corrected from scan_result to result
+        }
+        yield f"data: {json.dumps(done_event)}\n\n"
+        
     except Exception as e:
-        logger.error(f"Scan error: {str(e)}", exc_info=True)
-        error_data = {
+        logger.error(f"Scan failed: {str(e)}", exc_info=True) # Kept exc_info=True for better logging
+        error_event = {
             "step": "error",
             "status": "error",
             "error": str(e)
         }
-        yield f"data: {json.dumps(error_data)}\n\n"
+        yield f"data: {json.dumps(error_event)}\n\n"
 
 
 @router.post("/scan")
 @limiter.limit("10/minute")  # Rate limit: 10 scans per minute per IP
 async def scan_vulnerabilities(request: Request, scan_data: ScanRequest):
     """
-    Scan for AI/LLM vulnerabilities
-    
-    Returns a Server-Sent Events stream with progress updates
+    POST /scan endpoint with Server-Sent Events (SSE) streaming
+    Returns real-time progress updates during the scan
     """
     logger.info(f"Received scan request for company: {scan_data.company}")
     
