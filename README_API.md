@@ -241,11 +241,103 @@ for line in response.iter_lines():
 
 ## Deployment
 
-### Docker (Recommended)
+### Deploy FastAPI Backend to Railway
 
-Coming in Phase 3 - see `task.md`
+**Step 1: Prepare Your Code**
 
-### Manual Deployment
+Ensure your code is pushed to GitHub on the branch you want to deploy (e.g., `feat/fastapi-production-ready`).
+
+**Step 2: Create Railway Project**
+
+1. Sign up at https://railway.app
+2. Click **"New Project"**
+3. Select **"Deploy from GitHub repo"**
+4. Choose your repository: `your-username/ai-vulnerablity-scanner`
+5. Select the branch (e.g., `feat/fastapi-production-ready`)
+
+**Step 3: Configure Service**
+
+1. After the service is created, go to **Settings** tab
+2. Under **Source**:
+   - Set **Root Directory** to: `api-server`
+   - Save changes
+3. Under **Build**:
+   - Railway will automatically detect the `Dockerfile`
+   - No changes needed
+
+**Step 4: Add Environment Variables**
+
+1. Go to **Variables** tab
+2. Click **"New Variable"**
+3. Add the following:
+   - `GEMINI_API_KEY` = `your_gemini_api_key`
+   - `PARALLEL_API_KEY` = `your_parallel_api_key`
+
+**Step 5: Generate Public URL**
+
+1. Go to **Settings** tab
+2. Scroll to **Networking** section
+3. Click **"Generate Domain"**
+4. Copy the generated URL (e.g., `https://your-app-production.up.railway.app`)
+
+**Step 6: Verify Deployment**
+
+Test your deployment:
+```bash
+curl https://your-railway-url.up.railway.app/health
+```
+
+Expected response:
+```json
+{"status":"healthy","service":"ai-vulnerability-scanner","version":"1.0.0"}
+```
+
+### Deploy Next.js Frontend to Vercel
+
+**Step 1: Configure Environment Variable**
+
+Add the Railway URL to Vercel:
+
+```bash
+cd web-app
+
+# For preview deployments:
+vercel env add API_SERVER_URL preview
+# Enter: https://your-railway-url.up.railway.app
+
+# For production:
+vercel env add API_SERVER_URL production
+# Enter: https://your-railway-url.up.railway.app
+```
+
+**Step 2: Deploy Preview**
+
+```bash
+vercel
+```
+
+This creates a preview deployment you can test.
+
+**Step 3: Deploy to Production**
+
+Once preview is tested and working:
+```bash
+vercel --prod
+```
+
+### Verify Full Integration
+
+1. Open your Vercel preview URL
+2. Fill out the scan form
+3. Click "Start Scan"
+4. Verify:
+   - Progress bar updates in real-time
+   - Scan completes successfully
+   - Results are displayed
+
+---
+
+### Example: Railway Deployment
 
 1. **Deploy the FastAPI server** to your platform of choice:
    - Railway
