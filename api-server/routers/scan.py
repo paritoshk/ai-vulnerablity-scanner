@@ -65,33 +65,27 @@ async def generate_scan_stream(scan_data: ScanRequest):
         yield f"data: {json.dumps({'step': 'report', 'status': 'complete'})}\n\n"
         
         # Final result
-        result = {
-            "step": "done",
-            "status": "complete",
-            "result": {
-                "success": True,
-                "company": scan_data.company,
-                "llmProvider": scan_data.llmProvider,
-                "modelVersion": scan_data.modelVersion,
-                "contextWindow": scan_data.contextWindow,
-                "ragImplementation": scan_data.ragImplementation,
-                "vectorDb": scan_data.vectorDb,
-                "deploymentEnv": scan_data.deploymentEnv,
-                "analysis": analysis,
-                "risk": risk,
-            }
+        scan_result = {
+            "success": True,
+            "company": scan_data.company,
+            "llmProvider": scan_data.llmProvider,
+            "modelVersion": scan_data.modelVersion,
+            "contextWindow": scan_data.contextWindow,
+            "ragImplementation": scan_data.ragImplementation,
+            "vectorDb": scan_data.vectorDb,
+            "deploymentEnv": scan_data.deploymentEnv,
+            "analysis": analysis,
+            "risk": risk,
         }
-        
-        yield f"data: {json.dumps(result)}\n\n"
-        logger.info(f"Scan completed for {scan_data.company} - AI-RQ: {risk['ai_rq_score']}")
         
         # Send done event with full results
         done_event = {
             "step": "done",
             "status": "complete",
-            "result": result # Corrected from scan_result to result
+            "result": scan_result
         }
         yield f"data: {json.dumps(done_event)}\n\n"
+        logger.info(f"Scan completed for {scan_data.company} - AI-RQ: {risk['ai_rq_score']}")
         
     except Exception as e:
         logger.error(f"Scan failed: {str(e)}", exc_info=True) # Kept exc_info=True for better logging
