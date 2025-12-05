@@ -105,15 +105,20 @@ export async function POST(request: NextRequest) {
         return new Response(stream, {
             headers: {
                 "Content-Type": "text/event-stream",
-                "Cache-Control": "no-cache",
+                "Cache-Control": "no-cache, no-transform",
                 "Connection": "keep-alive",
+                "X-Accel-Buffering": "no", // Disable nginx buffering
             },
         });
     } catch (error: any) {
-        console.error("Scan error:", error);
+        console.error("Fatal error:", error);
         return NextResponse.json(
-            { success: false, error: error.message },
+            { success: false, error: error.message || "Internal server error" },
             { status: 500 }
         );
     }
 }
+
+// Disable static optimization for this route
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // Allow up to 60 seconds for scan
