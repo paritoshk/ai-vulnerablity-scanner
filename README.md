@@ -7,7 +7,7 @@ Agent that automatically discovers and fixes top vulnerabilities for your agenti
 ## Features
 
 - 🔍 **Real-time vulnerability search** using Parallel Web Systems API
-- 🤖 **AI-powered analysis** with Gemini Pro 3 (structured output via LiteLLM)
+- 🤖 **AI-powered analysis** with Gemini Pro 3 (structured output via LiteLLM) (System using 2.5 Pro for costs but you can upgrade to 3) 
 - 📊 **AI-RQ risk scoring** (0-1000 scale with investment-grade ratings)
 - 🏷️ **OWASP LLM Top 10 (2025)** classification
 - 🎯 **MITRE ATLAS** technique mapping
