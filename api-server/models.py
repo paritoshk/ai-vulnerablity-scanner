@@ -6,12 +6,12 @@ from typing import Optional
 class ScanRequest(BaseModel):
     """Request model for vulnerability scan"""
     company: str = Field(..., min_length=1, max_length=200, description="Company or product name")
-    llmProvider: str = Field(..., min_length=1, max_length=100, description="LLM provider (e.g., OpenAI, Anthropic)")
-    modelVersion: str = Field(..., min_length=1, max_length=100, description="Model version (e.g., GPT-4, Claude 3)")
-    contextWindow: str = Field(..., min_length=1, max_length=50, description="Context window size")
-    ragImplementation: str = Field(..., min_length=1, max_length=100, description="RAG implementation framework")
-    vectorDb: str = Field(..., min_length=1, max_length=100, description="Vector database used")
-    deploymentEnv: str = Field(..., min_length=1, max_length=100, description="Deployment environment")
+    llmProvider: str = Field(..., min_length=1, max_length=200, description="LLM provider (e.g., OpenAI, Anthropic)")
+    modelVersion: str = Field(..., min_length=1, max_length=500, description="Sensitive data exposure details")
+    contextWindow: str = Field(..., min_length=1, max_length=500, description="External content injection details")
+    ragImplementation: str = Field(..., min_length=1, max_length=200, description="RAG implementation framework")
+    vectorDb: str = Field(..., min_length=1, max_length=500, description="Document validation details")
+    deploymentEnv: str = Field(..., min_length=1, max_length=500, description="Security controls details")
 
 
 class ProgressUpdate(BaseModel):

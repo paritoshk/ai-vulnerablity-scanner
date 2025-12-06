@@ -9,10 +9,6 @@ load_dotenv()
 PARALLEL_API_KEY = os.getenv("PARALLEL_API_KEY")
 PARALLEL_URL = "https://api.parallel.ai/v1beta/search"
 
-# Validate API key is present
-if not PARALLEL_API_KEY:
-    raise ValueError("PARALLEL_API_KEY environment variable is required but not set")
-
 def search_vulnerabilities(hours_back: int = 24) -> dict:
     """
     Search for AI/LLM vulnerabilities using Parallel Web Systems API
@@ -61,6 +57,10 @@ def search_vulnerabilities(hours_back: int = 24) -> dict:
     }
 
     print(f"🔍 Searching vulnerabilities (last {hours_back}h)...")
+
+    # Validate API key is present
+    if not PARALLEL_API_KEY:
+        raise ValueError("PARALLEL_API_KEY environment variable is required but not set")
 
     try:
         with httpx.Client(timeout=60.0) as client:
