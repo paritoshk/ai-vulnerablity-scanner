@@ -6,10 +6,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { DownloadReportButton } from "@/components/download-report-button";
+import { Entropy } from "@/components/ui/entropy";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Shield, AlertTriangle, CheckCircle, Code, ExternalLink, ChevronDown, ChevronUp } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Shield, AlertTriangle, CheckCircle, Code, ExternalLink, ChevronDown, ChevronUp, Play, Loader2, ArrowRight, ArrowLeft } from "lucide-react";
 import { ScanProgress } from "@/components/scan-progress";
+import { Header } from "@/components/header";
+import { Footer } from "@/components/footer";
+import {
+    Carousel,
+    CarouselContent,
+    CarouselItem,
+    type CarouselApi,
+} from "@/components/ui/carousel";
 
 interface ScanStep {
     id: string;
@@ -23,6 +34,8 @@ export default function Dashboard() {
     const [isScanning, setIsScanning] = useState(false);
     const [scanResults, setScanResults] = useState<any>(null);
     const [expandedVuln, setExpandedVuln] = useState<number | null>(null);
+    const [api, setApi] = useState<CarouselApi>();
+    const [currentStep, setCurrentStep] = useState(0);
 
     // Scan progress
     const [scanSteps, setScanSteps] = useState<ScanStep[]>([
@@ -33,14 +46,15 @@ export default function Dashboard() {
         { id: "report", label: "Generating security report", status: "pending" },
     ]);
 
-    // Form state
-    const [companyName, setCompanyName] = useState("");
-    const [llmProvider, setLlmProvider] = useState("");
-    const [modelVersion, setModelVersion] = useState("");
-    const [contextWindow, setContextWindow] = useState("");
-    const [ragImplementation, setRagImplementation] = useState("");
-    const [vectorDb, setVectorDb] = useState("");
-    const [deploymentEnv, setDeploymentEnv] = useState("");
+    // Form state with PREFILLS
+    const [companyName, setCompanyName] = useState("Acme Corp AI Labs");
+    const [llmProvider, setLlmProvider] = useState("OpenAI GPT-4 Turbo, Anthropic Claude 3.5 Sonnet");
+    const [modelVersion, setModelVersion] = useState("PII, customer support history, product docs");
+    const [contextWindow, setContextWindow] = useState("Resume uploads, email ingestion, web scraping");
+    const [ragImplementation, setRagImplementation] = useState("Yes - Pinecone vector database with internal documentation and knowledge base");
+    const [vectorDb, setVectorDb] = useState("Basic content filtering for PII, no formal validation pipeline currently");
+    const [deploymentEnv, setDeploymentEnv] = useState("Rate limiting (100 req/min), NeMo Guardrails for basic prompt filtering, no function calling enabled");
+    const [testCoverage, setTestCoverage] = useState("manual");
 
     // Check if all critical questions are answered
     const isFormValid = companyName && llmProvider && modelVersion && contextWindow && ragImplementation && vectorDb && deploymentEnv;
@@ -54,6 +68,18 @@ export default function Dashboard() {
         }
     }, [router]);
 
+    useEffect(() => {
+        if (!api) {
+            return;
+        }
+
+        setCurrentStep(api.selectedScrollSnap() + 1);
+
+        api.on("select", () => {
+            setCurrentStep(api.selectedScrollSnap() + 1);
+        });
+    }, [api]);
+
     const updateStepStatus = (stepId: string, status: "running" | "complete") => {
         setScanSteps(prev =>
             prev.map(step =>
@@ -62,8 +88,7 @@ export default function Dashboard() {
         );
     };
 
-    const handleScan = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleScan = async () => {
         setIsScanning(true);
         setScanResults(null);
 
@@ -71,20 +96,20 @@ export default function Dashboard() {
         setScanSteps(prev => prev.map(step => ({ ...step, status: "pending" as const })));
 
         try {
-            // Simulate progress updates
-            const simulateProgress = async () => {
-                const steps = ["init", "search", "analyze", "score", "report"];
-                for (const step of steps) {
-                    updateStepStatus(step, "running");
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    updateStepStatus(step, "complete");
-                }
-            };
+            // 1. Run initial steps (Init -> Score)
+            const initialSteps = ["init", "search", "analyze", "score"];
+            for (const step of initialSteps) {
+                updateStepStatus(step, "running");
+                // Variable timing for realism (1s - 2s)
+                const delay = Math.floor(Math.random() * 1000) + 1000;
+                await new Promise(resolve => setTimeout(resolve, delay));
+                updateStepStatus(step, "complete");
+            }
 
-            // Start progress simulation
-            const progressPromise = simulateProgress();
+            // 2. Start final step (Report) and keep it running
+            updateStepStatus("report", "running");
 
-            // Make the actual API call
+            // 3. Make the actual API call (this can take 30s+)
             const response = await fetch("/api/scan", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -96,6 +121,7 @@ export default function Dashboard() {
                     ragImplementation,
                     vectorDb,
                     deploymentEnv,
+                    testCoverage
                 }),
             });
 
@@ -105,8 +131,11 @@ export default function Dashboard() {
 
             const result = await response.json();
 
-            // Wait for progress animation to finish
-            await progressPromise;
+            // 4. Complete the final step only AFTER we have data
+            updateStepStatus("report", "complete");
+
+            // Small delay to let the user see the "Complete" state before showing results
+            await new Promise(resolve => setTimeout(resolve, 500));
 
             // Check if we got results
             if (result.success !== false && result.analysis && result.risk) {
@@ -120,13 +149,13 @@ export default function Dashboard() {
         } catch (error: any) {
             console.error("Scan failed:", error);
             alert(`Scan failed: ${error.message || "Unknown error"}`);
+            // Mark current running step as failed or just stop
         } finally {
             setIsScanning(false);
         }
     };
 
     const getSeverityColor = (severity: string) => {
-
         switch (severity?.toLowerCase()) {
             case "critical": return "bg-red-500/10 text-red-400 border-red-500/30";
             case "high": return "bg-orange-500/10 text-orange-400 border-orange-500/30";
@@ -137,451 +166,306 @@ export default function Dashboard() {
     };
 
     if (!isAuthorized) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <p className="text-zinc-500">Verifying access...</p>
-            </div>
-        );
+        return null;
     }
 
     return (
-        <div className="min-h-screen bg-black text-white py-8">
-            {/* Header */}
-            <div className="max-w-5xl mx-auto px-6 mb-12">
-                <div className="flex flex-col items-center text-center gap-6">
-                    {/* Logo */}
-                    <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center shadow-2xl shadow-orange-500/30 glow-orange">
-                        <Shield className="w-11 h-11 text-black" />
-                    </div>
+        <div className="h-screen bg-black text-white flex flex-col overflow-hidden">
+            <Header />
 
-                    <div className="space-y-2">
-                        <h1 className="text-4xl font-bold gradient-text">AI Security Assessment</h1>
-                        <p className="text-zinc-400 text-lg">Adversarial Robustness Evaluation</p>
-                    </div>
-
-                    <Badge className="bg-green-500/20 text-green-400 border-green-500/30 px-4 py-1">
-                        <CheckCircle className="w-3 h-3 mr-1" />
-                        Authorized
-                    </Badge>
-                </div>
-            </div>
-
-            <div className="max-w-4xl mx-auto px-8 space-y-16">
-                {/* Company Intake Form */}
-                <Card className="bg-zinc-900/50 border-zinc-700/50 backdrop-blur-xl glow-orange">
-                    <CardHeader className="space-y-6 pb-10 pt-10">
-                        <div className="flex items-center gap-4">
-                            <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 flex items-center justify-center">
-                                <Shield className="w-7 h-7 text-black" />
+            <div className="flex-1 grid grid-cols-2 overflow-hidden">
+                {/* Left Panel - Carousel Form */}
+                <div className="border-r border-zinc-800 bg-zinc-950/50 flex flex-col relative">
+                    <div className="flex-1 flex items-center justify-center p-12">
+                        <div className="w-full max-w-xl">
+                            <div className="mb-8 flex items-center justify-between">
+                                <div>
+                                    <h2 className="text-2xl font-bold text-white mb-2">Configuration Wizard</h2>
+                                    <p className="text-zinc-400">Step {currentStep} of 4</p>
+                                </div>
+                                <div className="flex gap-1">
+                                    {[1, 2, 3, 4].map((step) => (
+                                        <div
+                                            key={step}
+                                            className={`h-1.5 w-8 rounded-full transition-all ${step === currentStep ? "bg-orange-500" : step < currentStep ? "bg-orange-900" : "bg-zinc-800"}`}
+                                        />
+                                    ))}
+                                </div>
                             </div>
-                            <div>
-                                <CardTitle className="text-3xl font-bold tracking-tight text-white">
-                                    Security Assessment
-                                </CardTitle>
-                                <p className="text-orange-400 font-medium mt-1">Enterprise AI Risk Profiling</p>
+
+                            <Carousel setApi={setApi} className="w-full">
+                                <CarouselContent>
+                                    {/* Step 1: Basic Info */}
+                                    <CarouselItem>
+                                        <div className="space-y-8 border border-zinc-800 bg-black/50 p-10 rounded-xl backdrop-blur-sm">
+                                            <div className="space-y-6">
+                                                <div className="grid gap-3">
+                                                    <Label htmlFor="company" className="text-base font-semibold text-zinc-400 uppercase tracking-wider">Organization Name</Label>
+                                                    <Input
+                                                        id="company"
+                                                        value={companyName}
+                                                        onChange={(e) => setCompanyName(e.target.value)}
+                                                        className="bg-zinc-900 border-zinc-800 focus:border-orange-500 h-14 text-lg"
+                                                    />
+                                                </div>
+
+                                                <div className="grid gap-3">
+                                                    <Label htmlFor="llm" className="text-base font-semibold text-zinc-400 uppercase tracking-wider">LLM Provider</Label>
+                                                    <Input
+                                                        id="llm"
+                                                        value={llmProvider}
+                                                        onChange={(e) => setLlmProvider(e.target.value)}
+                                                        maxLength={200}
+                                                        className="bg-zinc-900 border-zinc-800 focus:border-orange-500 h-14 text-lg"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CarouselItem>
+
+                                    {/* Step 2: Data Risks */}
+                                    <CarouselItem>
+                                        <div className="space-y-8 border border-zinc-800 bg-black/50 p-10 rounded-xl backdrop-blur-sm">
+                                            <div className="space-y-6">
+                                                <div className="grid gap-3">
+                                                    <Label htmlFor="model" className="text-base font-semibold text-zinc-400 uppercase tracking-wider">Sensitive Data Exposure</Label>
+                                                    <Textarea
+                                                        id="model"
+                                                        value={modelVersion}
+                                                        onChange={(e) => setModelVersion(e.target.value)}
+                                                        maxLength={500}
+                                                        className="bg-zinc-900 border-zinc-800 focus:border-orange-500 min-h-[160px] resize-none text-lg leading-relaxed"
+                                                    />
+                                                </div>
+
+                                                <div className="grid gap-3">
+                                                    <Label htmlFor="context" className="text-base font-semibold text-zinc-400 uppercase tracking-wider">External Content Injection</Label>
+                                                    <Textarea
+                                                        id="context"
+                                                        value={contextWindow}
+                                                        onChange={(e) => setContextWindow(e.target.value)}
+                                                        maxLength={500}
+                                                        className="bg-zinc-900 border-zinc-800 focus:border-orange-500 min-h-[160px] resize-none text-lg leading-relaxed"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CarouselItem>
+
+                                    {/* Step 3: RAG */}
+                                    <CarouselItem>
+                                        <div className="space-y-8 border border-zinc-800 bg-black/50 p-10 rounded-xl backdrop-blur-sm">
+                                            <div className="space-y-6">
+                                                <div className="grid gap-3">
+                                                    <Label htmlFor="rag" className="text-base font-semibold text-zinc-400 uppercase tracking-wider">RAG Implementation</Label>
+                                                    <Input
+                                                        id="rag"
+                                                        value={ragImplementation}
+                                                        onChange={(e) => setRagImplementation(e.target.value)}
+                                                        maxLength={200}
+                                                        className="bg-zinc-900 border-zinc-800 focus:border-orange-500 h-14 text-lg"
+                                                    />
+                                                </div>
+
+                                                <div className="grid gap-3">
+                                                    <Label htmlFor="vector" className="text-base font-semibold text-zinc-400 uppercase tracking-wider">Document Validation</Label>
+                                                    <Textarea
+                                                        id="vector"
+                                                        value={vectorDb}
+                                                        onChange={(e) => setVectorDb(e.target.value)}
+                                                        maxLength={500}
+                                                        className="bg-zinc-900 border-zinc-800 focus:border-orange-500 min-h-[160px] resize-none text-lg leading-relaxed"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CarouselItem>
+
+                                    {/* Step 4: Security & Launch */}
+                                    <CarouselItem>
+                                        <div className="space-y-8 border border-zinc-800 bg-black/50 p-10 rounded-xl backdrop-blur-sm">
+                                            <div className="space-y-6">
+                                                <div className="grid gap-3">
+                                                    <Label htmlFor="deploy" className="text-base font-semibold text-zinc-400 uppercase tracking-wider">Security Controls</Label>
+                                                    <Textarea
+                                                        id="deploy"
+                                                        value={deploymentEnv}
+                                                        onChange={(e) => setDeploymentEnv(e.target.value)}
+                                                        maxLength={500}
+                                                        className="bg-zinc-900 border-zinc-800 focus:border-orange-500 min-h-[140px] resize-none text-lg leading-relaxed"
+                                                    />
+                                                </div>
+
+                                                <div className="grid gap-3 relative">
+                                                    <Label htmlFor="test-coverage" className="text-base font-semibold text-zinc-400 uppercase tracking-wider">Test Coverage</Label>
+                                                    <Select value={testCoverage} onValueChange={setTestCoverage}>
+                                                        <SelectTrigger className="bg-zinc-900 border-zinc-800 focus:border-orange-500 h-14 w-full text-lg">
+                                                            <SelectValue placeholder="Select coverage level" />
+                                                        </SelectTrigger>
+                                                        <SelectContent className="bg-zinc-900 border-zinc-800 text-white z-[100]">
+                                                            <SelectItem value="manual" className="text-lg py-3">Manual Testing Only</SelectItem>
+                                                            <SelectItem value="unit" className="text-lg py-3">Unit Tests</SelectItem>
+                                                            <SelectItem value="integration" className="text-lg py-3">Integration Tests</SelectItem>
+                                                            <SelectItem value="e2e" className="text-lg py-3">End-to-End Tests</SelectItem>
+                                                            <SelectItem value="cicd" className="text-lg py-3">Full CI/CD Pipeline</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                </div>
+
+                                                <Button
+                                                    onClick={handleScan}
+                                                    disabled={isScanning || !isFormValid}
+                                                    className="w-full bg-orange-500 hover:bg-orange-600 text-black font-bold h-16 text-xl shadow-lg shadow-orange-500/20 mt-6"
+                                                >
+                                                    {isScanning ? (
+                                                        <span className="flex items-center gap-3">
+                                                            <Loader2 className="h-6 w-6 animate-spin" />
+                                                            Running Analysis...
+                                                        </span>
+                                                    ) : (
+                                                        <span className="flex items-center gap-3">
+                                                            <Play className="h-6 w-6" />
+                                                            Start Assessment
+                                                        </span>
+                                                    )}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </CarouselItem>
+                                </CarouselContent>
+                            </Carousel>
+
+                            <div className="flex justify-between mt-8">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => api?.scrollPrev()}
+                                    disabled={currentStep === 1}
+                                    className="border-zinc-800 hover:bg-zinc-900 text-zinc-400 hover:text-white"
+                                >
+                                    <ArrowLeft className="mr-2 h-4 w-4" /> Previous
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    onClick={() => api?.scrollNext()}
+                                    disabled={currentStep === 4}
+                                    className="border-zinc-800 hover:bg-zinc-900 text-zinc-400 hover:text-white"
+                                >
+                                    Next <ArrowRight className="ml-2 h-4 w-4" />
+                                </Button>
                             </div>
                         </div>
-                        <CardDescription className="text-base leading-relaxed text-zinc-400 max-w-3xl">
-                            Threat intelligence based on <span className="text-orange-400 font-medium">OWASP LLM Top 10</span>, <span className="text-orange-400 font-medium">NIST AI RMF</span>, and analysis of recent real-world exploits including AI-orchestrated cyber espionage campaigns.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="pb-10">
-                        <form onSubmit={handleScan} className="space-y-10">
-                            {/* Organization & Model */}
-                            <div className="space-y-6">
-                                <div className="flex items-center gap-3 pb-2 border-b border-zinc-800">
-                                    <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                                        <span className="text-orange-400 font-bold text-sm">1</span>
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-white">Basic Information</h3>
-                                </div>
+                    </div>
 
-                                <div className="space-y-3">
-                                    <Label htmlFor="company" className="text-base font-medium text-zinc-300">
-                                        Organization Name
-                                    </Label>
-                                    <Input
-                                        id="company"
-                                        placeholder="Your company name"
-                                        value={companyName}
-                                        onChange={(e) => setCompanyName(e.target.value)}
-                                        className="bg-black/50 border-zinc-700 h-12 text-base focus:border-orange-500 focus:ring-orange-500/20 transition-all"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-3">
-                                    <Label htmlFor="llm" className="text-base font-medium text-zinc-300">
-                                        Primary LLM Provider(s) in Production
-                                    </Label>
-                                    <Input
-                                        id="llm"
-                                        placeholder="e.g., OpenAI GPT-4, Anthropic Claude 3.5 Sonnet, Google Gemini"
-                                        value={llmProvider}
-                                        onChange={(e) => setLlmProvider(e.target.value)}
-                                        className="bg-black/50 border-zinc-700 h-12 text-base focus:border-orange-500 focus:ring-orange-500/20 transition-all"
-                                        required
-                                    />
-                                    <p className="text-xs text-zinc-500 flex items-center gap-1">
-                                        <span className="w-1 h-1 rounded-full bg-zinc-600"></span>
-                                        Include all models with production access
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Data & Content Risks */}
-                            <div className="space-y-6 pt-2">
-                                <div className="flex items-center gap-3 pb-2 border-b border-zinc-800">
-                                    <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                                        <span className="text-orange-400 font-bold text-sm">2</span>
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-white">Data & Content Exposure</h3>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <Label htmlFor="model" className="text-base font-medium text-zinc-300">
-                                        What types of sensitive data does your LLM process?
-                                    </Label>
-                                    <Textarea
-                                        id="model"
-                                        placeholder="e.g., PII (names, emails, SSNs), proprietary code, trade secrets, HIPAA/PHI data, financial records, customer conversations"
-                                        value={modelVersion}
-                                        onChange={(e) => setModelVersion(e.target.value)}
-                                        className="bg-black/50 border-zinc-700 min-h-28 text-base focus:border-orange-500 focus:ring-orange-500/20 transition-all resize-none"
-                                        required
-                                    />
-                                    <p className="text-xs text-zinc-500 flex items-center gap-1">
-                                        <span className="w-1 h-1 rounded-full bg-orange-500"></span>
-                                        Assesses risks of sensitive information disclosure (OWASP LLM02)
-                                    </p>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <Label htmlFor="context" className="text-base font-medium text-zinc-300">
-                                        Are users able to inject external content into prompts?
-                                    </Label>
-                                    <Textarea
-                                        id="context"
-                                        placeholder="e.g., Resume upload for analysis, customer support emails, website content scraping, PDF document processing, user-provided URLs"
-                                        value={contextWindow}
-                                        onChange={(e) => setContextWindow(e.target.value)}
-                                        className="bg-black/50 border-zinc-700 min-h-28 text-base focus:border-orange-500 focus:ring-orange-500/20 transition-all resize-none"
-                                        required
-                                    />
-                                    <p className="text-xs text-zinc-500 flex items-center gap-1">
-                                        <span className="w-1 h-1 rounded-full bg-orange-500"></span>
-                                        Critical for identifying prompt injection attack surface (OWASP LLM01)
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* RAG & Retrieval */}
-                            <div className="space-y-6 pt-2">
-                                <div className="flex items-center gap-3 pb-2 border-b border-zinc-800">
-                                    <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                                        <span className="text-orange-400 font-bold text-sm">3</span>
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-white">Retrieval-Augmented Generation</h3>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <Label htmlFor="rag" className="text-base font-medium text-zinc-300">
-                                        Do you use RAG or connect the LLM to external knowledge bases?
-                                    </Label>
-                                    <Input
-                                        id="rag"
-                                        placeholder="e.g., Yes - Pinecone + internal docs, No RAG, LangChain with company wiki"
-                                        value={ragImplementation}
-                                        onChange={(e) => setRagImplementation(e.target.value)}
-                                        className="bg-black/50 border-zinc-700 h-12 text-base focus:border-orange-500 focus:ring-orange-500/20 transition-all"
-                                        required
-                                    />
-                                </div>
-
-                                <div className="space-y-3">
-                                    <Label htmlFor="vector" className="text-base font-medium text-zinc-300">
-                                        How do you validate retrieved documents before LLM consumption?
-                                    </Label>
-                                    <Textarea
-                                        id="vector"
-                                        placeholder="e.g., No validation, Content filtering for PII, Access control checks, Metadata verification, None currently"
-                                        value={vectorDb}
-                                        onChange={(e) => setVectorDb(e.target.value)}
-                                        className="bg-black/50 border-zinc-700 min-h-24 text-base focus:border-orange-500 focus:ring-orange-500/20 transition-all resize-none"
-                                        required
-                                    />
-                                    <p className="text-xs text-zinc-500 flex items-center gap-1">
-                                        <span className="w-1 h-1 rounded-full bg-orange-500"></span>
-                                        Addresses training data poisoning and RAG pipeline security
-                                    </p>
-                                </div>
-                            </div>
-
-                            {/* Output Handling & Guardrails */}
-                            <div className="space-y-6 pt-2">
-                                <div className="flex items-center gap-3 pb-2 border-b border-zinc-800">
-                                    <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                                        <span className="text-orange-400 font-bold text-sm">4</span>
-                                    </div>
-                                    <h3 className="text-lg font-semibold text-white">Output Handling & Security Controls</h3>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <Label htmlFor="deploy" className="text-base font-medium text-zinc-300">
-                                        What controls prevent the LLM from executing harmful actions?
-                                    </Label>
-                                    <Textarea
-                                        id="deploy"
-                                        placeholder="e.g., NeMo Guardrails for prompt filtering, human-in-the-loop for critical actions, rate limiting, no tool/function calling enabled, LLM cannot execute code"
-                                        value={deploymentEnv}
-                                        onChange={(e) => setDeploymentEnv(e.target.value)}
-                                        className="bg-black/50 border-zinc-700 min-h-28 text-base focus:border-orange-500 focus:ring-orange-500/20 transition-all resize-none"
-                                        required
-                                    />
-                                    <p className="text-xs text-zinc-500 flex items-center gap-1">
-                                        <span className="w-1 h-1 rounded-full bg-orange-500"></span>
-                                        Mitigates excessive agency (OWASP LLM06) and insecure output handling (OWASP LLM05)
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="pt-4">
-                                <Button
-                                    type="submit"
-                                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-black font-bold h-14 text-base shadow-lg shadow-orange-500/25 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
-                                    disabled={isScanning || !isFormValid}
-                                >
-                                    {isScanning ? (
-                                        <span className="flex items-center gap-2">
-                                            <span className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin"></span>
-                                            Running Security Analysis...
-                                        </span>
-                                    ) : (
-                                        "Start Vulnerability Scan"
-                                    )}
-                                </Button>
-
-                                {!isFormValid && (
-                                    <p className="text-sm text-zinc-500 text-center mt-4 flex items-center justify-center gap-2">
-                                        <AlertTriangle className="w-4 h-4" />
-                                        Please answer all questions to enable scan
-                                    </p>
-                                )}
-                            </div>
-                        </form>
-
-                        {/* Scan Progress */}
-                        {isScanning && (
-                            <div className="mt-8">
+                    {/* Scan Progress Overlay */}
+                    {isScanning && (
+                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50">
+                            <div className="w-full max-w-md p-6 bg-zinc-900 border border-orange-500/30 rounded-xl shadow-2xl shadow-orange-500/10">
                                 <ScanProgress steps={scanSteps} />
                             </div>
-                        )}
-                    </CardContent>
-                </Card>
+                        </div>
+                    )}
+                </div>
 
-                {/* Results Section */}
-                {scanResults && (
-                    <>
-                        {/* Metrics */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                            <Card className="bg-zinc-900 border-zinc-800">
-                                <CardContent className="pt-6">
-                                    <div className="flex items-center gap-2 mb-1">
-                                        <p className="text-sm text-zinc-500">AI-RQ Score</p>
-                                        <div className="group relative">
-                                            <AlertTriangle className="w-3.5 h-3.5 text-orange-400 cursor-help" />
-                                            <div className="absolute left-0 top-6 w-64 bg-zinc-950 border border-orange-500/30 rounded-lg p-3 text-xs text-zinc-300 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
-                                                <p className="font-semibold text-orange-400 mb-1">AI Risk Quotient</p>
-                                                <p className="leading-relaxed">
-                                                    Calculated from: vulnerability severity (40%), exploitability (30%), affected systems (20%), and patch availability (10%).
-                                                    Range: 0-1000 (lower is better).
-                                                </p>
-                                            </div>
+                {/* Right Panel - Results */}
+                <div className="bg-black flex flex-col overflow-hidden relative">
+                    {/* Background Grid Pattern */}
+                    <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
+
+                    <div className="flex-1 overflow-y-auto p-8 relative z-10">
+                        {!scanResults ? (
+                            <div className="h-full flex flex-col items-center justify-center text-zinc-500 space-y-4 opacity-50">
+                                <Shield className="w-24 h-24 stroke-1" />
+                                <div className="text-center">
+                                    <h3 className="text-xl font-medium text-zinc-400">Ready to Scan</h3>
+                                    <p className="text-sm mt-2">Configure the assessment parameters on the left<br />to generate a comprehensive security report.</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div id="scan-results-panel" className="max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                                <div className="flex items-center justify-between border-b border-zinc-800 pb-6">
+                                    <div>
+                                        <h2 className="text-3xl font-bold text-white">Assessment Report</h2>
+                                        <p className="text-zinc-400 mt-1">Generated on {new Date().toLocaleDateString()}</p>
+                                    </div>
+                                    <div className="flex gap-6 items-end">
+                                        <DownloadReportButton targetId="scan-results-panel" />
+                                        <div className="text-right">
+                                            <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Risk Score</p>
+                                            <p className="text-4xl font-bold text-orange-500">{scanResults.risk?.ai_rq_score || 0}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Vulnerabilities</p>
+                                            <p className="text-4xl font-bold text-white">{scanResults.analysis?.vulnerabilities?.length || 0}</p>
                                         </div>
                                     </div>
-                                    <p className="text-3xl font-bold text-orange-500 mt-1">
-                                        {scanResults.risk?.ai_rq_score || 0}
-                                    </p>
-                                    <p className="text-xs text-zinc-600 mt-1">/ 1000</p>
-                                </CardContent>
-                            </Card>
+                                </div>
 
-                            <Card className="bg-zinc-900 border-zinc-800">
-                                <CardContent className="pt-6">
-                                    <p className="text-sm text-zinc-500">Vulnerabilities</p>
-                                    <p className="text-3xl font-bold text-red-400 mt-1">
-                                        {scanResults.analysis?.vulnerabilities?.length || 0}
-                                    </p>
-                                    <p className="text-xs text-zinc-600 mt-1">identified</p>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="bg-zinc-900 border-zinc-800">
-                                <CardContent className="pt-6">
-                                    <p className="text-sm text-zinc-500">Patches</p>
-                                    <p className="text-3xl font-bold text-green-400 mt-1">
-                                        {scanResults.analysis?.patches?.length || 0}
-                                    </p>
-                                    <p className="text-xs text-zinc-600 mt-1">generated</p>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="bg-zinc-900 border-zinc-800">
-                                <CardContent className="pt-6">
-                                    <p className="text-sm text-zinc-500">Rating</p>
-                                    <p className="text-3xl font-bold mt-1">
-                                        {scanResults.risk?.rating || "N/A"}
-                                    </p>
-                                    <p className="text-xs text-zinc-600 mt-1">Security Grade</p>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        {/* Threat Intelligence Summary */}
-                        <Card className="bg-zinc-900 border-orange-500/30">
-                            <CardHeader>
-                                <CardTitle className="text-lg">Threat Intelligence Summary</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <p className="text-sm text-zinc-300 leading-relaxed">
-                                    {scanResults.analysis?.summary}
-                                </p>
-                            </CardContent>
-                        </Card>
-
-                        {/* Vulnerability Cards */}
-                        <div className="space-y-4">
-                            <h2 className="text-2xl font-bold">Identified Attack Vectors</h2>
-                            {scanResults.analysis?.vulnerabilities?.map((vuln: any, idx: number) => (
-                                <Card key={idx} className="bg-zinc-900 border-zinc-800 hover:border-orange-500/30 transition-all">
+                                <Card className="bg-zinc-900/50 border-orange-500/20">
                                     <CardHeader>
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div className="flex-1">
-                                                <div className="flex items-center gap-2 mb-2">
-                                                    <Badge className={getSeverityColor(vuln.severity)}>
-                                                        {vuln.severity?.toUpperCase()}
-                                                    </Badge>
-                                                    {vuln.cve && (
-                                                        <Badge className="bg-zinc-800 text-zinc-300">
-                                                            {vuln.cve}
-                                                        </Badge>
-                                                    )}
-                                                    {vuln.exploitability_score && (
-                                                        <Badge className="bg-zinc-800 text-orange-400">
-                                                            Exploit: {vuln.exploitability_score}/10
-                                                        </Badge>
-                                                    )}
-                                                </div>
-                                                <CardTitle className="text-xl">{vuln.title}</CardTitle>
-                                            </div>
-                                            <Button
-                                                variant="ghost"
-                                                size="sm"
-                                                onClick={() => setExpandedVuln(expandedVuln === idx ? null : idx)}
-                                                className="text-zinc-400"
-                                            >
-                                                {expandedVuln === idx ? <ChevronUp /> : <ChevronDown />}
-                                            </Button>
-                                        </div>
-
-                                        <CardDescription className="mt-2">
-                                            <div className="flex flex-wrap gap-2 text-xs">
-                                                {vuln.owasp_category && (
-                                                    <span className="text-orange-400">OWASP: {vuln.owasp_category}</span>
-                                                )}
-                                                {vuln.mitre_technique && (
-                                                    <span className="text-blue-400">• MITRE: {vuln.mitre_technique}</span>
-                                                )}
-                                            </div>
-                                        </CardDescription>
+                                        <CardTitle className="text-lg text-orange-400">Executive Summary</CardTitle>
                                     </CardHeader>
-
-                                    {expandedVuln === idx && (
-                                        <CardContent className="space-y-4 border-t border-zinc-800 pt-4">
-                                            <div>
-                                                <h4 className="text-sm font-semibold text-zinc-400 mb-2">Technical Description</h4>
-                                                <p className="text-sm text-zinc-300 leading-relaxed">{vuln.description}</p>
-                                            </div>
-
-                                            {vuln.affected_systems && (
-                                                <div>
-                                                    <h4 className="text-sm font-semibold text-zinc-400 mb-2">Affected Systems</h4>
-                                                    <p className="text-sm text-zinc-300">{vuln.affected_systems}</p>
-                                                </div>
-                                            )}
-
-                                            {vuln.source_url && (
-                                                <div>
-                                                    <h4 className="text-sm font-semibold text-zinc-400 mb-2">Reference</h4>
-                                                    <a
-                                                        href={vuln.source_url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        className="text-sm text-orange-400 hover:text-orange-300 flex items-center gap-1"
-                                                    >
-                                                        {vuln.source_url} <ExternalLink className="w-3 h-3" />
-                                                    </a>
-                                                </div>
-                                            )}
-
-                                            {/* Show associated patch */}
-                                            {scanResults.analysis?.patches?.find((p: any) =>
-                                                p.vulnerability_id === vuln.id || p.title?.includes(vuln.title?.split(' ')[0])
-                                            ) && (
-                                                    <div className="bg-black p-4 rounded-lg border border-green-500/30">
-                                                        <h4 className="text-sm font-semibold text-green-400 mb-2 flex items-center gap-2">
-                                                            <Code className="w-4 h-4" />
-                                                            Recommended Mitigation
-                                                        </h4>
-                                                        {(() => {
-                                                            const patch = scanResults.analysis.patches.find((p: any) =>
-                                                                p.vulnerability_id === vuln.id || p.title?.includes(vuln.title?.split(' ')[0])
-                                                            );
-                                                            return (
-                                                                <>
-                                                                    <p className="text-sm text-zinc-300 mb-3">{patch.description}</p>
-                                                                    {patch.code_example && (
-                                                                        <pre className="bg-zinc-950 p-3 rounded text-xs overflow-x-auto border border-zinc-800">
-                                                                            <code className="text-green-400">{patch.code_example}</code>
-                                                                        </pre>
-                                                                    )}
-                                                                </>
-                                                            );
-                                                        })()}
-                                                    </div>
-                                                )}
-                                        </CardContent>
-                                    )}
+                                    <CardContent>
+                                        <p className="text-zinc-300 leading-relaxed text-lg">
+                                            {scanResults.analysis?.summary}
+                                        </p>
+                                    </CardContent>
                                 </Card>
-                            ))}
-                        </div>
-                    </>
-                )}
 
-                {/* Methodology - At Bottom */}
-                <div className="border-t border-zinc-800 pt-8 mt-12">
-                    <h2 className="text-xl font-bold mb-4">Methodology & Threat Coverage</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                        <Card className="bg-zinc-900/50 border-zinc-800">
-                            <CardHeader>
-                                <CardTitle className="text-base">Attack Surface Analysis</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2 text-zinc-400">
-                                <p><strong className="text-zinc-300">OWASP LLM Top 10 (2025):</strong> Prompt injection through indirect context manipulation, training data poisoning via supply chain compromise, insecure output handling in RAG pipelines</p>
-                                <p><strong className="text-zinc-300">MITRE ATLAS:</strong> ML model inference API exploitation (T0040), adversarial perturbation of embeddings (T0043), exfiltration via inference side-channels (T0024)</p>
-                            </CardContent>
-                        </Card>
+                                <div className="space-y-4">
+                                    <h3 className="text-xl font-bold text-white">Detailed Findings</h3>
+                                    {scanResults.analysis?.vulnerabilities?.map((vuln: any, idx: number) => (
+                                        <Card key={idx} className="bg-zinc-900 border-zinc-800 hover:border-orange-500/30 transition-all group">
+                                            <CardHeader className="cursor-pointer" onClick={() => setExpandedVuln(expandedVuln === idx ? null : idx)}>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="space-y-1">
+                                                        <div className="flex items-center gap-3">
+                                                            <Badge className={getSeverityColor(vuln.severity)}>
+                                                                {vuln.severity}
+                                                            </Badge>
+                                                            <span className="font-semibold text-white text-lg group-hover:text-orange-400 transition-colors">{vuln.title}</span>
+                                                        </div>
+                                                    </div>
+                                                    {expandedVuln === idx ? <ChevronUp className="w-5 h-5 text-zinc-500" /> : <ChevronDown className="w-5 h-5 text-zinc-500" />}
+                                                </div>
+                                            </CardHeader>
+                                            {expandedVuln === idx && (
+                                                <CardContent className="pt-0 border-t border-zinc-800 mt-4">
+                                                    <div className="pt-6 space-y-6">
+                                                        <p className="text-base text-zinc-300 leading-relaxed">{vuln.description}</p>
 
-                        <Card className="bg-zinc-900/50 border-zinc-800">
-                            <CardHeader>
-                                <CardTitle className="text-base">Detection Pipeline</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2 text-zinc-400">
-                                <p><strong className="text-zinc-300">1. Threat Intelligence:</strong> Real-time aggregation of CVE databases, security advisories, arXiv preprints on adversarial ML</p>
-                                <p><strong className="text-zinc-300">2. LLM Analysis:</strong> Gemini 2.5 Pro with structured output for attack vector classification and exploit likelihood scoring</p>
-                                <p><strong className="text-zinc-300">3. Remediation:</strong> Context-aware patch generation with defensive code examples</p>
-                            </CardContent>
-                        </Card>
+                                                        {scanResults.analysis?.patches?.find((p: any) =>
+                                                            p.vulnerability_id === vuln.id || p.title?.includes(vuln.title?.split(' ')[0])
+                                                        ) && (
+                                                                <div className="bg-black p-6 rounded-lg border border-zinc-800">
+                                                                    <h4 className="text-sm font-bold text-green-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+                                                                        <Code className="w-4 h-4" />
+                                                                        Remediation Strategy
+                                                                    </h4>
+                                                                    {(() => {
+                                                                        const patch = scanResults.analysis.patches.find((p: any) =>
+                                                                            p.vulnerability_id === vuln.id || p.title?.includes(vuln.title?.split(' ')[0])
+                                                                        );
+                                                                        return (
+                                                                            <div className="space-y-4">
+                                                                                <p className="text-sm text-zinc-400">{patch.description}</p>
+                                                                                {patch.code_example && (
+                                                                                    <pre className="bg-zinc-900 p-4 rounded-lg text-sm overflow-x-auto font-mono text-green-400 border border-zinc-800">
+                                                                                        {patch.code_example}
+                                                                                    </pre>
+                                                                                )}
+                                                                            </div>
+                                                                        );
+                                                                    })()}
+                                                                </div>
+                                                            )}
+                                                    </div>
+                                                </CardContent>
+                                            )}
+                                        </Card>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
