@@ -388,7 +388,7 @@ export default function Dashboard() {
                                         <p className="text-zinc-400 mt-1">Generated on {new Date().toLocaleDateString()}</p>
                                     </div>
                                     <div className="flex gap-6 items-end">
-                                        <DownloadReportButton targetId="scan-results-panel" />
+                                        <DownloadReportButton targetId="scan-results-panel" scanData={scanResults} />
                                         <div className="text-right">
                                             <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Risk Score</p>
                                             <p className="text-4xl font-bold text-orange-500">{scanResults.risk?.ai_rq_score || 0}</p>

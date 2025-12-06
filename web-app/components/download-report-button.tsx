@@ -3,68 +3,50 @@
 import { Button } from "@/components/ui/button"
 import { Download, Loader2 } from "lucide-react"
 import { useState } from "react"
-import html2canvas from "html2canvas"
-import jsPDF from "jspdf"
 
-export function DownloadReportButton({ targetId }: { targetId: string }) {
+interface DownloadReportButtonProps {
+    targetId: string
+    scanData?: any
+}
+
+export function DownloadReportButton({ targetId, scanData }: DownloadReportButtonProps) {
     const [isGenerating, setIsGenerating] = useState(false)
 
     const handleDownload = async () => {
+        if (!scanData) {
+            alert("No scan data available for download")
+            return
+        }
+
         setIsGenerating(true)
         try {
-            const element = document.getElementById(targetId)
-            if (!element) throw new Error("Report element not found")
+            console.log("Requesting PDF from backend...")
 
-            // Capture the element
-            const canvas = await html2canvas(element, {
-                scale: 2, // Higher resolution
-                backgroundColor: "#000000", // Force black background
-                useCORS: true,
-                logging: false,
-                ignoreElements: (element: Element) => element.classList.contains("no-print"), // Ignore elements with no-print class
-            } as any)
-
-            const imgData = canvas.toDataURL("image/png")
-
-            // Calculate PDF dimensions (A4)
-            const pdf = new jsPDF({
-                orientation: "portrait",
-                unit: "mm",
-                format: "a4",
+            const response = await fetch("/api/scan/generate-pdf", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(scanData)
             })
 
-            const pdfWidth = pdf.internal.pageSize.getWidth();
-            const pdfHeight = pdf.internal.pageSize.getHeight();
-
-            const imgWidth = pdfWidth;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-            // If image is taller than page, we might need multiple pages or just scale it fit?
-            // For now, let's just add it. If it's too long, it might get cut off or we need to handle pagination.
-            // Given the report is a single panel, it might fit or be long.
-            // Let's just add it starting at top.
-
-            pdf.addImage(imgData, "PNG", 0, 0, imgWidth, imgHeight)
-
-            // Add Watermark
-            pdf.setTextColor(150, 150, 150)
-            pdf.setFontSize(50)
-            // Save graphics state not always available in basic jspdf types? 
-            // It is available.
-            pdf.saveGraphicsState()
-            pdf.setGState(new (pdf as any).GState({ opacity: 0.1 }))
-
-            // Add diagonal watermarks
-            for (let i = 0; i < 5; i++) {
-                pdf.text("CONFIDENTIAL", 20, 50 + (i * 60), { angle: 45 })
-                pdf.text("AI SCANNER", 100, 50 + (i * 60), { angle: 45 })
+            if (!response.ok) {
+                throw new Error(`PDF generation failed: ${response.statusText}`)
             }
 
-            pdf.restoreGraphicsState()
+            // Download the file
+            const blob = await response.blob()
+            const url = window.URL.createObjectURL(blob)
+            const a = document.createElement('a')
+            a.href = url
+            a.download = `ai-security-report-${scanData.company.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.html`
+            document.body.appendChild(a)
+            a.click()
+            window.URL.revokeObjectURL(url)
+            document.body.removeChild(a)
 
-            pdf.save("ai-security-report.pdf")
+            console.log("PDF downloaded successfully!")
         } catch (error) {
             console.error("PDF Generation failed:", error)
+            alert(`Failed to generate PDF: ${error instanceof Error ? error.message : 'Unknown error'}`)
         } finally {
             setIsGenerating(false)
         }

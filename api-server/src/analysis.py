@@ -119,19 +119,38 @@ def analyze_with_gemini(search_data: dict) -> dict:
 
             # Extract the structured response
             content = response.choices[0].message.content
-            logger.debug(f"Received response from {display_name}, parsing...")
+            logger.debug(f"Received response from {display_name}")
+
+            # Check for empty response
+            if not content:
+                logger.error(f"Empty response from {display_name}")
+                raise ValueError("Empty response from API")
+
+            logger.debug(f"Response content (first 200 chars): {str(content)[:200]}")
 
             # Parse the JSON response
             if isinstance(content, str):
-                # Handle potential markdown formatting
-                if "```json" in content:
+                # Sanitize content - remove markdown formatting
+                sanitized = content.strip()
+                if "```json" in sanitized:
                     logger.debug("Detected markdown JSON formatting, extracting...")
-                    content = content.split("```json")[1].split("```")[0]
-                elif "```" in content:
+                    sanitized = sanitized.split("```json")[1].split("```")[0].strip()
+                elif "```" in sanitized:
                     logger.debug("Detected markdown code block, extracting...")
-                    content = content.split("```")[1].split("```")[0]
+                    sanitized = sanitized.split("```")[1].split("```")[0].strip()
 
-                analysis = json.loads(content.strip())
+                # Try to parse JSON
+                try:
+                    analysis = json.loads(sanitized)
+                except json.JSONDecodeError as e:
+                    logger.error(f"JSON parsing failed: {e}")
+                    logger.error(f"Content: {sanitized[:500]}")
+                    # Return empty structure instead of failing
+                    return {
+                        "vulnerabilities": [],
+                        "patches": [],
+                        "summary": f"JSON parsing failed with {display_name}: {str(e)}"
+                    }
             else:
                 # If already parsed
                 logger.debug("Response already parsed as structured data")
@@ -141,7 +160,7 @@ def analyze_with_gemini(search_data: dict) -> dict:
             patch_count = len(analysis.get('patches', []))
             logger.info(f"✅ Analysis complete using {display_name}")
             logger.info(f"   Found {vuln_count} vulnerabilities and {patch_count} patches")
-            
+
             return analysis
 
         except Exception as e:

@@ -6,7 +6,7 @@ from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
 import logging
 
-from routers import scan
+from routers import scan, pdf
 
 # Configure logging
 logging.basicConfig(
@@ -42,6 +42,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # Include routers
 app.include_router(scan.router, prefix="/api", tags=["scan"])
+app.include_router(pdf.router, prefix="/api", tags=["pdf"])
 
 
 @app.get("/health")
