@@ -7,7 +7,7 @@ export function Footer() {
     const [isOpen, setIsOpen] = useState(false)
 
     return (
-        <div className={`fixed bottom-0 left-0 right-0 bg-zinc-950 border-t border-zinc-800 transition-all duration-500 ease-in-out z-50 flex flex-col shadow-2xl ${isOpen ? "h-[85vh]" : "h-12"}`}>
+        <div className={`fixed bottom-0 left-0 right-0 bg-zinc-950 border-t border-zinc-800 transition-all duration-500 ease-in-out z-50 flex flex-col shadow-2xl ${isOpen ? "h-[75vh] md:h-[85vh]" : "h-12"}`}>
             <div
                 className="h-12 shrink-0 flex items-center justify-between px-6 cursor-pointer hover:bg-zinc-900 border-b border-zinc-900 transition-colors"
                 onClick={() => setIsOpen(!isOpen)}

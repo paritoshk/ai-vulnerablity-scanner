@@ -170,13 +170,13 @@ export default function Dashboard() {
     }
 
     return (
-        <div className="h-screen bg-black text-white flex flex-col overflow-hidden">
+        <div className="min-h-screen bg-black text-white flex flex-col overflow-auto md:overflow-hidden md:h-screen">
             <Header />
 
-            <div className="flex-1 grid grid-cols-2 overflow-hidden">
+            <div className="flex-1 flex flex-col md:grid md:grid-cols-2 overflow-hidden">
                 {/* Left Panel - Carousel Form */}
-                <div className="border-r border-zinc-800 bg-zinc-950/50 flex flex-col relative">
-                    <div className="flex-1 flex items-center justify-center p-12">
+                <div className="border-b md:border-b-0 md:border-r border-zinc-800 bg-zinc-950/50 flex flex-col relative">
+                    <div className="flex-1 flex items-center justify-center p-6 md:p-12">
                         <div className="w-full max-w-xl">
                             <div className="mb-8 flex items-center justify-between">
                                 <div>
@@ -367,11 +367,11 @@ export default function Dashboard() {
                 </div>
 
                 {/* Right Panel - Results */}
-                <div className="bg-black flex flex-col overflow-hidden relative">
+                <div className="bg-black flex flex-col flex-1 overflow-hidden relative min-h-[60vh] md:min-h-0">
                     {/* Background Grid Pattern */}
                     <div className="absolute inset-0 bg-[linear-gradient(to_right,#80808012_1px,transparent_1px),linear-gradient(to_bottom,#80808012_1px,transparent_1px)] bg-[size:24px_24px] pointer-events-none" />
 
-                    <div className="flex-1 overflow-y-auto p-8 relative z-10">
+                    <div className="flex-1 overflow-y-auto p-4 md:p-8 relative z-10">
                         {!scanResults ? (
                             <div className="h-full flex flex-col items-center justify-center text-zinc-500 space-y-4 opacity-50">
                                 <Shield className="w-24 h-24 stroke-1" />
