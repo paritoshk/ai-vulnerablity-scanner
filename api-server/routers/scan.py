@@ -36,9 +36,18 @@ async def scan_vulnerabilities(request: Request, scan_data: ScanRequest):
         logger.info(f"Starting vulnerability search for {scan_data.company}")
         search_data = search_vulnerabilities(hours_back=24)
         
-        # Step 2: Analyze with Gemini
+        # Step 2: Analyze with Gemini - pass user's configuration for personalized results
         logger.info("Analyzing vulnerabilities with Gemini Pro 3")
-        analysis = analyze_with_gemini(search_data)
+        user_config = {
+            "company": scan_data.company,
+            "llm_provider": scan_data.llmProvider,
+            "sensitive_data": scan_data.modelVersion,
+            "external_content": scan_data.contextWindow,
+            "rag_implementation": scan_data.ragImplementation,
+            "document_validation": scan_data.vectorDb,
+            "security_controls": scan_data.deploymentEnv,
+        }
+        analysis = analyze_with_gemini(search_data, user_config)
         
         # Step 3: Calculate risk score
         logger.info("Calculating AI-RQ risk score")

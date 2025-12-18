@@ -18,13 +18,29 @@ os.environ["GEMINI_API_KEY"] = GEMINI_API_KEY
 # Set up logger
 logger = setup_logger("analysis")
 
-PROMPT_TEMPLATE = """You are an AI security analyst. Analyze these search results for AI/LLM vulnerabilities.
+PROMPT_TEMPLATE = """You are an AI security analyst performing a PERSONALIZED vulnerability assessment.
 
-SEARCH RESULTS:
+=== CLIENT CONFIGURATION ===
+Organization: {company}
+LLM Provider(s): {llm_provider}
+Sensitive Data Exposure: {sensitive_data}
+External Content Sources: {external_content}
+RAG Implementation: {rag_implementation}
+Document Validation: {document_validation}
+Security Controls: {security_controls}
+
+=== RECENT VULNERABILITY INTELLIGENCE ===
 {search_results}
 
-TASK:
-1. EXTRACT each distinct vulnerability from the search results
+=== YOUR TASK ===
+Analyze vulnerabilities that are SPECIFICALLY RELEVANT to this client's configuration.
+
+1. PRIORITIZE vulnerabilities that match their:
+   - LLM provider(s) mentioned
+   - RAG/vector database setup
+   - Data types they handle
+   - Current security control gaps
+
 2. CLASSIFY with OWASP LLM Top 10 (2025):
    - LLM01:2025 Prompt Injection
    - LLM02:2025 Sensitive Information Disclosure
@@ -48,19 +64,19 @@ TASK:
    - AML.T0018: Backdoor ML Model
    - AML.T0057: LLM Meta Prompt Extraction
 
-4. PROPOSE actionable patches with Python code examples where applicable
+4. PROPOSE patches that address THEIR specific setup and security control gaps
 
 IMPORTANT:
-- For severity, use one of: critical, high, medium, low
+- Focus on vulnerabilities RELEVANT to their configuration, not generic ones
+- Reference their specific LLM provider, RAG setup, and data types in descriptions
+- For severity, use one of: critical, high, medium, low  
 - For patch_type, use one of: code_patch, config_change, dependency_update, architecture_change
-- Provide concrete, actionable information
-- Include source URLs from the search results
-- Use discovered_date in YYYY-MM-DD format
+- Provide concrete, actionable remediation for THEIR environment
 
-Provide a comprehensive analysis with vulnerabilities, patches, and a summary.
+Provide a comprehensive, PERSONALIZED analysis with vulnerabilities, patches, and a summary.
 """
 
-def analyze_with_gemini(search_data: dict) -> dict:
+def analyze_with_gemini(search_data: dict, user_config: dict = None) -> dict:
     """
     Parse and classify vulnerabilities with Gemini using structured output
     
@@ -69,10 +85,23 @@ def analyze_with_gemini(search_data: dict) -> dict:
 
     Args:
         search_data: Dictionary containing search results from Parallel Web Systems
+        user_config: Dictionary containing user's configuration (company, LLM provider, etc.)
 
     Returns:
         Dictionary with vulnerabilities, patches, and summary
     """
+    
+    # Default user config if not provided
+    if user_config is None:
+        user_config = {
+            "company": "Unknown Organization",
+            "llm_provider": "Not specified",
+            "sensitive_data": "Not specified",
+            "external_content": "Not specified",
+            "rag_implementation": "Not specified",
+            "document_validation": "Not specified",
+            "security_controls": "Not specified",
+        }
     
     logger.info("Starting vulnerability analysis with Gemini AI")
 
@@ -83,7 +112,18 @@ def analyze_with_gemini(search_data: dict) -> dict:
         results_text = json.dumps(results, indent=2, default=str)[:50000]
 
     logger.debug(f"Processing {len(results_text)} characters of search results")
-    prompt = PROMPT_TEMPLATE.format(search_results=results_text)
+    logger.info(f"Personalizing analysis for: {user_config.get('company', 'Unknown')}")
+    
+    prompt = PROMPT_TEMPLATE.format(
+        company=user_config.get("company", "Unknown"),
+        llm_provider=user_config.get("llm_provider", "Not specified"),
+        sensitive_data=user_config.get("sensitive_data", "Not specified"),
+        external_content=user_config.get("external_content", "Not specified"),
+        rag_implementation=user_config.get("rag_implementation", "Not specified"),
+        document_validation=user_config.get("document_validation", "Not specified"),
+        security_controls=user_config.get("security_controls", "Not specified"),
+        search_results=results_text
+    )
 
     # Define models to try in order (primary -> fallback)
     models_to_try = [
